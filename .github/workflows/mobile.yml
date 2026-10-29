@@ -1,0 +1,40 @@
+name: Mobile build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/**', 'scripts/build-mobile.mjs', 'package.json']
+
+permissions:
+  contents: write
+
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.4.2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/build-mobile.mjs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mobile
+          path: dist-mobile/*
+      # Publish the build to a `mobile` branch so the userscript has a stable URL.
+      - name: Publish to the mobile branch
+        run: |
+          cd dist-mobile
+          git init -q -b mobile
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -q -m "build: mobile ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" mobile
